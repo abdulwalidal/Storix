@@ -18,6 +18,8 @@ import java.util.List;
 @Data
 public class FileService {
 
+    private static final long MAX_FILE_SIZE = 10 * 1024; // 10 KB (for testing)
+
     private final StorageService storageService;
     private final FileMetadataRepository fileMetadataRepository;
 
@@ -38,6 +40,30 @@ public class FileService {
 
             throw new InvalidFileException("File cannot be empty");
         }
+
+        if (file.getOriginalFilename() == null ||
+                file.getOriginalFilename().isBlank()) {
+
+            log.warn("Upload rejected: file has no name");
+            throw new InvalidFileException("File must have a name");
+        }
+
+        if (file.getSize() > MAX_FILE_SIZE) {
+            log.warn("File rejected because it is too large: {} ({} bytes)",
+                    file.getOriginalFilename(),
+                    file.getSize());
+
+            throw new InvalidFileException("File size cannot exceed 10 KB");
+        }
+
+        if (file.getContentType() == null || file.getContentType().isBlank()) {
+            log.warn("Upload rejected: content type is missing for file: {}",
+                    file.getOriginalFilename());
+
+            throw new InvalidFileException("File content type is required");
+        }
+
+
 
 
         String storedFileName = storageService.store(file);
