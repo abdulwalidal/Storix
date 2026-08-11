@@ -75,6 +75,10 @@ public class LocalStorageService implements StorageService {
         try {
             Path file = storageLocation.resolve(filename).normalize();
 
+            if(!file.startsWith(storageLocation)) {
+                throw new StorageException("Invalid file path");
+            }
+
             Resource resource = new UrlResource(file.toUri());
 
             if (resource.exists() && resource.isReadable()) {
