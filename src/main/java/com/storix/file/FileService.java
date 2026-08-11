@@ -35,35 +35,7 @@ public class FileService {
                 file.getOriginalFilename(),
                 file.getSize());
 
-        if(file.isEmpty()) {
-            log.warn("Empty file received: {}", file.getOriginalFilename());
-
-            throw new InvalidFileException("File cannot be empty");
-        }
-
-        if (file.getOriginalFilename() == null ||
-                file.getOriginalFilename().isBlank()) {
-
-            log.warn("Upload rejected: file has no name");
-            throw new InvalidFileException("File must have a name");
-        }
-
-        if (file.getSize() > MAX_FILE_SIZE) {
-            log.warn("File rejected because it is too large: {} ({} bytes)",
-                    file.getOriginalFilename(),
-                    file.getSize());
-
-            throw new InvalidFileException("File size cannot exceed 10 KB");
-        }
-
-        if (file.getContentType() == null || file.getContentType().isBlank()) {
-            log.warn("Upload rejected: content type is missing for file: {}",
-                    file.getOriginalFilename());
-
-            throw new InvalidFileException("File content type is required");
-        }
-
-
+        validate(file);
 
 
         String storedFileName = storageService.store(file);
@@ -98,7 +70,7 @@ public class FileService {
 
     public void delete(Long id) {
         FileMetadata fileMetadata = fileMetadataRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("File not found"));
+                .orElseThrow(() -> new FileNotFoundException("File not found"));
 
         storageService.delete(fileMetadata.getStoredFileName());
 
@@ -107,9 +79,18 @@ public class FileService {
     }
 
     public FileMetadata update(Long id, MultipartFile newFile) {
+        log.info("User is trying to update the file");
+
 
         FileMetadata fileMetadata = fileMetadataRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("File not found"));
+                .orElseThrow(() -> new FileNotFoundException("File not found"));
+
+        log.info("Update request received. Filename: {}, Size: {} bytes",
+                newFile.getOriginalFilename(),
+                newFile.getSize());
+
+       validate(newFile);
+
 
         String newStoredFileName = storageService.replace(fileMetadata.getStoredFileName(), newFile);
 
@@ -121,9 +102,38 @@ public class FileService {
         return fileMetadataRepository.save(fileMetadata);
 
 
+    }
+
+    private void validate(MultipartFile file) {
 
 
+        if(file.isEmpty()) {
+            log.warn("Empty file received: {}", file.getOriginalFilename());
 
+            throw new InvalidFileException("File cannot be empty");
+        }
+
+        if (file.getOriginalFilename() == null ||
+                file.getOriginalFilename().isBlank()) {
+
+            log.warn("file has no name");
+            throw new InvalidFileException("File must have a name");
+        }
+
+        if (file.getSize() > MAX_FILE_SIZE) {
+            log.warn("File rejected because it is too large: {} ({} bytes)",
+                    file.getOriginalFilename(),
+                    file.getSize());
+
+            throw new InvalidFileException("File size cannot exceed 10 KB");
+        }
+
+        if (file.getContentType() == null || file.getContentType().isBlank()) {
+            log.warn("content type is missing for file: {}",
+                    file.getOriginalFilename());
+
+            throw new InvalidFileException("File content type is required");
+        }
 
     }
 
