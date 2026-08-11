@@ -13,8 +13,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
-import java.nio.file.Path;
 import java.util.UUID;
 
 @Slf4j
@@ -99,26 +97,38 @@ public class LocalStorageService implements StorageService {
     public void delete(String fileName) {
 
         try {
-            Path file = storageLocation.resolve(fileName);
-            Files.deleteIfExists(file);
-        } catch (IOException e) {
-            throw new StorageException("Failed to delete that file", e);
-        }
+            Path file = storageLocation.resolve(fileName).normalize();
 
+            if (!file.startsWith(storageLocation)) {
+                throw new StorageException("Invalid file path");
+            }
+
+            if (!Files.exists(file)) {
+                throw new FileNotFoundException("File not found: " + fileName);
+            }
+
+            Files.delete(file);
+
+        } catch (IOException e) {
+            throw new StorageException("Failed to delete file", e);
+        }
     }
 
-    // - Delete the old physical file.
-    // - Store the new file.
-    // - Return the new stored filename.
+//    Store new
+//    ↓
+//    Delete old
+//   ↓
+//   Return new filename
     @Override
     public String replace(String oldFileName, MultipartFile newFile) {
 
-
-
         log.info("Replacing old files : {} ", oldFileName);
 
+        String newStoredFile = store(newFile);
         delete(oldFileName);
-        return store(newFile);
+
+        return newStoredFile;
+
 
     }
 
