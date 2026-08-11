@@ -4,21 +4,33 @@ import com.storix.exception.FileNotFoundException;
 import com.storix.exception.InvalidFileException;
 import com.storix.repository.FileMetadataRepository;
 import com.storix.storage.StorageService;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
 @Data
 public class FileService {
 
-    private static final long MAX_FILE_SIZE = 10 * 1024; // 10 KB (for testing)
+    @Value("${storix.storage.max-file-size}")
+    private long maxFileSize;
+
+
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "application/pdf",
+            "image/png",
+            "image/jpeg",
+            "text/plain"
+    );
 
     private final StorageService storageService;
     private final FileMetadataRepository fileMetadataRepository;
@@ -120,12 +132,12 @@ public class FileService {
             throw new InvalidFileException("File must have a name");
         }
 
-        if (file.getSize() > MAX_FILE_SIZE) {
+        if (file.getSize() > maxFileSize) {
             log.warn("File rejected because it is too large: {} ({} bytes)",
                     file.getOriginalFilename(),
                     file.getSize());
 
-            throw new InvalidFileException("File size cannot exceed 10 KB");
+            throw new InvalidFileException("File size exceeds the maximum allowed size");
         }
 
         if (file.getContentType() == null || file.getContentType().isBlank()) {
@@ -133,6 +145,12 @@ public class FileService {
                     file.getOriginalFilename());
 
             throw new InvalidFileException("File content type is required");
+        }
+
+        if(!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) { // if the allowed-content-types list does NOT contain the file's content type, reject the file
+            log.warn("File type not allowed {}", file.getContentType());
+            throw new InvalidFileException("File type is not allowed");
+
         }
 
     }
