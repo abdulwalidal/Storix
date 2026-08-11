@@ -1,5 +1,8 @@
 package com.storix.storage;
 
+import com.storix.exception.FileNotFoundException;
+import com.storix.exception.StorageException;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -18,12 +21,15 @@ import java.util.UUID;
 @Service
 public class LocalStorageService implements StorageService {
 
+
+
     private final Path storageLocation; // It represents a folder path, receives its value once and cannot later be replaced.
 
 
     public LocalStorageService(
-            @Value("${storix.storage.location}") String storageLocation
+             @Value("${storix.storage.location}") String storageLocation
     ) {
+
         this.storageLocation = Path.of(storageLocation)
                 .toAbsolutePath()
                 .normalize();
@@ -31,16 +37,14 @@ public class LocalStorageService implements StorageService {
         try {
             Files.createDirectories(this.storageLocation);
         } catch (IOException e) {
-            throw new RuntimeException("Could not initialize storage", e);
+            throw new StorageException("Could not initialize storage", e);
         }
     }
 
     // // Receives the uploaded file from the controller.
     @Override
     public String store(MultipartFile file) {
-        if(file.isEmpty()) {
-            throw new RuntimeException("Cannot store an empty file");
-        }
+
 
         String uniqueFileName = UUID.randomUUID().toString(); // // Generate a unique filename to avoid duplicate file names.
 
@@ -58,7 +62,7 @@ public class LocalStorageService implements StorageService {
         try {
             Files.copy(file.getInputStream(), destinationFile);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to store file.", e);
+            throw new StorageException("Failed to store file.", e);
         }
 
         return storedFileName;
@@ -66,22 +70,25 @@ public class LocalStorageService implements StorageService {
 
     // Find that file in our storage folder and give it back as a Spring Resource.
     @Override
-    public Resource load(String filename) { // We receive the filename (example "fileName = "abc123.png"
+    public Resource load(String filename) {
 
         try {
-            // Build the path to the requested file inside our storage folder.
             Path file = storageLocation.resolve(filename).normalize();
 
             Resource resource = new UrlResource(file.toUri());
-            if(resource.exists() && resource.isReadable()) {
+
+            if (resource.exists() && resource.isReadable()) {
                 return resource;
             }
 
-            throw new RuntimeException("file not found " + filename);
-        } catch (MalformedURLException e) {
-            throw new RuntimeException("Could not load file " + filename,e);
-        }
+            throw new FileNotFoundException("File not found: " + filename);
 
+        } catch (MalformedURLException e) {
+            throw new StorageException(
+                    "Could not load file " + filename,
+                    e
+            );
+        }
     }
 
     @Override
@@ -91,7 +98,7 @@ public class LocalStorageService implements StorageService {
             Path file = storageLocation.resolve(fileName);
             Files.deleteIfExists(file);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to delete that file", e);
+            throw new StorageException("Failed to delete that file", e);
         }
 
     }
@@ -101,6 +108,8 @@ public class LocalStorageService implements StorageService {
     // - Return the new stored filename.
     @Override
     public String replace(String oldFileName, MultipartFile newFile) {
+
+
 
         log.info("Replacing old files : {} ", oldFileName);
 
