@@ -1,5 +1,6 @@
 package com.storix.controller;
 
+import com.storix.dto.FileResponse;
 import com.storix.file.FileMetadata;
 import com.storix.file.FileService;
 import com.storix.storage.StorageService;
@@ -36,12 +37,12 @@ public class FileController {
 
 
     @PostMapping
-    public ResponseEntity<FileMetadata> uploadFile(@RequestParam("file") MultipartFile file) {
-        FileMetadata metadata = fileService.upload(file);
+    public ResponseEntity<FileResponse> uploadFile(@RequestParam("file") MultipartFile file) {
+        FileResponse fileResponse  = fileService.upload(file);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(metadata);
+                .body(fileResponse);
 
     }
 

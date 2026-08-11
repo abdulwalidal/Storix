@@ -1,5 +1,6 @@
 package com.storix.file;
 
+import com.storix.dto.FileResponse;
 import com.storix.exception.FileNotFoundException;
 import com.storix.exception.InvalidFileException;
 import com.storix.repository.FileMetadataRepository;
@@ -40,7 +41,7 @@ public class FileService {
         this.fileMetadataRepository = fileMetadataRepository;
     }
 
-    public FileMetadata upload(MultipartFile file) {
+    public FileResponse upload(MultipartFile file) {
 
 
         log.info("Upload request received. Filename: {}, Size: {} bytes",
@@ -58,7 +59,9 @@ public class FileService {
         metadata.setContentType(file.getContentType());
         metadata.setSize(file.getSize());
 
-        return fileMetadataRepository.save(metadata);
+        FileMetadata savedMetaData = fileMetadataRepository.save(metadata);
+
+        return toFileResponse(savedMetaData);
 
     }
 
@@ -153,6 +156,16 @@ public class FileService {
 
         }
 
+    }
+
+    private FileResponse toFileResponse(FileMetadata fileMetadata) {
+        FileResponse fileResponse = new FileResponse();
+        fileResponse.setId(fileMetadata.getId());
+        fileResponse.setOriginalFileName(fileMetadata.getOriginalFileName());
+        fileResponse.setContentType(fileResponse.getContentType());
+        fileResponse.setSize(fileResponse.getSize());
+
+        return fileResponse;
     }
 
 
