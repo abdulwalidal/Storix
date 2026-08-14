@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -23,7 +24,7 @@ import java.util.Set;
 public class FileService {
 
     @Value("${storix.storage.max-file-size}")
-    private long maxFileSize;
+    private DataSize maxFileSize;
 
 
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
@@ -135,7 +136,7 @@ public class FileService {
             throw new InvalidFileException("File must have a name");
         }
 
-        if (file.getSize() > maxFileSize) {
+        if (file.getSize() > maxFileSize.toBytes()) {
             log.warn("File rejected because it is too large: {} ({} bytes)",
                     file.getOriginalFilename(),
                     file.getSize());
