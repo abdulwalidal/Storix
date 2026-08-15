@@ -11,6 +11,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.util.unit.DataSize;
 
@@ -130,6 +132,43 @@ public class FileServiceTest {
         assertThrows(
                 FileNotFoundException.class,
                 ()-> fileService.getFileMetaData(1L)
+        );
+
+
+    }
+
+    @Test
+    void download_shouldDownloadFile() {
+
+        FileMetadata fileMetadata = new FileMetadata();
+        fileMetadata.setId(1L);
+        fileMetadata.setStoredFileName("abc123.pdf");
+
+        when(fileMetadataRepository.findById(1L))
+                .thenReturn(Optional.of(fileMetadata));
+
+        Resource resource = new ByteArrayResource(
+                "Hello Storix".getBytes()
+        );
+
+        when(storageService.load("abc123.pdf"))
+                .thenReturn(resource);
+
+        Resource result = fileService.download(1L);
+
+        assertEquals(resource, result);
+    }
+
+
+
+    @Test
+    void download_ShouldThrownWhenFileNotFound() {
+        when(fileMetadataRepository.findById(1L))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                FileNotFoundException.class,
+                ()-> fileService.download(1L)
         );
 
 
