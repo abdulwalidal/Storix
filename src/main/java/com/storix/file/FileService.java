@@ -18,9 +18,9 @@ import java.io.File;
 import java.util.List;
 import java.util.Set;
 
+@Data
 @Slf4j
 @Service
-@Data
 public class FileService {
 
     @Value("${storix.storage.max-file-size}")
@@ -66,9 +66,17 @@ public class FileService {
 
     }
 
-    public List<FileMetadata> getAllFiles() {
+    public List<FileResponse> getAllFiles() {
 
-        return fileMetadataRepository.findAll();
+        List<FileMetadata> metadataList = fileMetadataRepository.findAll();
+
+        // For every FileMetadata in this list, call toFileResponse() and put the resulting FileResponse into the new list.
+        return metadataList.stream()
+                .map(this::toFileResponse)
+                .toList();
+
+
+
     }
 
     public Resource download(Long id) {
@@ -78,9 +86,13 @@ public class FileService {
         return storageService.load(fileMetadata.getStoredFileName());
     }
 
-    public FileMetadata getFileMetaData (Long id) {
-        return fileMetadataRepository.findById(id)
+    public FileResponse getFileMetaData (Long id) {
+        FileMetadata fileMetadata =  fileMetadataRepository.findById(id)
                 .orElseThrow(() -> new FileNotFoundException("File not found"));
+
+        log.info("getFileMetaData is called");
+
+        return toFileResponse(fileMetadata);
 
     }
 
@@ -94,7 +106,7 @@ public class FileService {
 
     }
 
-    public FileMetadata update(Long id, MultipartFile newFile) {
+    public FileResponse update(Long id, MultipartFile newFile) {
         log.info("User is trying to update the file");
 
 
@@ -115,7 +127,9 @@ public class FileService {
         fileMetadata.setContentType(newFile.getContentType());
         fileMetadata.setSize(newFile.getSize());
 
-        return fileMetadataRepository.save(fileMetadata);
+        FileMetadata savedmetaData = fileMetadataRepository.save(fileMetadata);
+
+        return toFileResponse(savedmetaData);
 
 
     }
@@ -163,8 +177,8 @@ public class FileService {
         FileResponse fileResponse = new FileResponse();
         fileResponse.setId(fileMetadata.getId());
         fileResponse.setOriginalFileName(fileMetadata.getOriginalFileName());
-        fileResponse.setContentType(fileResponse.getContentType());
-        fileResponse.setSize(fileResponse.getSize());
+        fileResponse.setContentType(fileMetadata.getContentType());
+        fileResponse.setSize(fileMetadata.getSize());
 
         return fileResponse;
     }
