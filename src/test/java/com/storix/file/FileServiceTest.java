@@ -21,8 +21,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class FileServiceTest {
@@ -162,7 +161,7 @@ public class FileServiceTest {
 
 
     @Test
-    void download_ShouldThrownWhenFileNotFound() {
+    void download_ShouldThrownWhenFileNotFound(){
         when(fileMetadataRepository.findById(1L))
                 .thenReturn(Optional.empty());
 
@@ -173,6 +172,40 @@ public class FileServiceTest {
 
 
     }
+
+    @Test
+    void delete_ShouldDeleteFile() {
+
+        FileMetadata fileMetadata = new FileMetadata();
+        fileMetadata.setId(1L);
+        fileMetadata.setStoredFileName("abc123.pdf");
+
+        when(fileMetadataRepository.findById(1L))
+                .thenReturn(Optional.of(fileMetadata));
+
+        fileService.delete(1L);
+
+        verify(storageService)
+                .delete("abc123.pdf");
+
+        verify(fileMetadataRepository)
+                .delete(fileMetadata);
+    }
+
+
+    @Test
+    void delete_ShouldThrownWhenFileNotFound() {
+        when(fileMetadataRepository.findById(1L))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                FileNotFoundException.class,
+                ()-> fileService.delete(1L)
+        );
+
+
+    }
+
 
 
 
