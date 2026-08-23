@@ -13,6 +13,8 @@ import java.util.Map;
 
 @Slf4j
 @RestControllerAdvice
+
+// GlobalExceptionHandler is basically the traffic controller for errors
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(FileNotFoundException.class)
@@ -38,6 +40,8 @@ public class GlobalExceptionHandler {
 //                .status(HttpStatus.BAD_REQUEST)
 //                .body(Map.of("message", exception.getMessage()));
 //    }
+
+    // Whenever InvalidFileException happens, use this method to create the HTTP response.
 
     @ExceptionHandler(InvalidFileException.class)
     public ResponseEntity<ErrorResponse> handleInvalidFile(
