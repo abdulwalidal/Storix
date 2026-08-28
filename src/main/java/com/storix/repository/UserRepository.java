@@ -1,5 +1,6 @@
 package com.storix.repository;
 
+import com.storix.file.FileMetadata;
 import com.storix.user.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 

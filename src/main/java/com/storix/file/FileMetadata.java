@@ -1,9 +1,7 @@
 package com.storix.file;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import com.storix.user.User;
+import jakarta.persistence.*;
 import lombok.Data;
 
 @Data
@@ -17,5 +15,10 @@ public class FileMetadata {
     private String storedFileName;
     private String contentType;
     private Long size;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;
+
 
 }

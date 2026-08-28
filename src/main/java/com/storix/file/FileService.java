@@ -4,12 +4,17 @@ import com.storix.dto.FileResponse;
 import com.storix.exception.FileNotFoundException;
 import com.storix.exception.InvalidFileException;
 import com.storix.repository.FileMetadataRepository;
+import com.storix.repository.UserRepository;
 import com.storix.storage.StorageService;
+import com.storix.user.User;
 import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,20 +41,30 @@ public class FileService {
 
     private final StorageService storageService;
     private final FileMetadataRepository fileMetadataRepository;
+    private final UserRepository userRepository;
 
-    public FileService(StorageService storageService, FileMetadataRepository fileMetadataRepository) {
+    public FileService(StorageService storageService, FileMetadataRepository fileMetadataRepository, UserRepository userRepository) {
         this.storageService = storageService;
         this.fileMetadataRepository = fileMetadataRepository;
+        this.userRepository = userRepository;
     }
 
     public FileResponse upload(MultipartFile file) {
-
 
         log.info("Upload request received. Filename: {}, Size: {} bytes",
                 file.getOriginalFilename(),
                 file.getSize());
 
         validate(file);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication(); //  Get the currently authenticated user
+
+        String email = auth.getName();
+
+        // find the user in the database
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
 
 
         String storedFileName = storageService.store(file);
@@ -59,6 +74,7 @@ public class FileService {
         metadata.setStoredFileName(storedFileName);
         metadata.setContentType(file.getContentType());
         metadata.setSize(file.getSize());
+        metadata.setUser(user);
 
         FileMetadata savedMetaData = fileMetadataRepository.save(metadata);
 
@@ -68,7 +84,11 @@ public class FileService {
 
     public List<FileResponse> getAllFiles() {
 
-        List<FileMetadata> metadataList = fileMetadataRepository.findAll();
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+
+        List<FileMetadata> metadataList = fileMetadataRepository.findByUserEmail(email);
 
         // For every FileMetadata in this list, call toFileResponse() and put the resulting FileResponse into the new list.
         return metadataList.stream()
@@ -80,14 +100,28 @@ public class FileService {
     }
 
     public Resource download(Long id) {
-        FileMetadata fileMetadata = fileMetadataRepository.findById(id)
+
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+
+
+
+
+        FileMetadata fileMetadata = fileMetadataRepository.findByIdAndUserEmail(id, email)
                 .orElseThrow(() -> new FileNotFoundException("File not found"));
 
         return storageService.load(fileMetadata.getStoredFileName());
     }
 
     public FileResponse getFileMetaData (Long id) {
-        FileMetadata fileMetadata =  fileMetadataRepository.findById(id)
+
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+
+
+        FileMetadata fileMetadata =  fileMetadataRepository.findByIdAndUserEmail(id, email)
                 .orElseThrow(() -> new FileNotFoundException("File not found"));
 
         log.info("getFileMetaData is called");
@@ -97,7 +131,12 @@ public class FileService {
     }
 
     public void delete(Long id) {
-        FileMetadata fileMetadata = fileMetadataRepository.findById(id)
+
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+
+        FileMetadata fileMetadata = fileMetadataRepository.findByIdAndUserEmail(id, email)
                 .orElseThrow(() -> new FileNotFoundException("File not found"));
 
         storageService.delete(fileMetadata.getStoredFileName());
@@ -106,11 +145,18 @@ public class FileService {
 
     }
 
+
+
     public FileResponse update(Long id, MultipartFile newFile) {
+
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+
         log.info("User is trying to update the file");
 
 
-        FileMetadata fileMetadata = fileMetadataRepository.findById(id)
+        FileMetadata fileMetadata = fileMetadataRepository.findByIdAndUserEmail(id, email)
                 .orElseThrow(() -> new FileNotFoundException("File not found"));
 
         log.info("Update request received. Filename: {}, Size: {} bytes",
