@@ -181,6 +181,8 @@ public class FileService {
         storageService.delete(fileMetadata.getStoredFileName());
 
         fileMetadataRepository.delete(fileMetadata);
+        String key = "file:" + id;
+        redisTemplate.delete(key);
 
     }
 
@@ -212,9 +214,14 @@ public class FileService {
         fileMetadata.setContentType(newFile.getContentType());
         fileMetadata.setSize(newFile.getSize());
 
-        FileMetadata savedmetaData = fileMetadataRepository.save(fileMetadata);
+        FileMetadata savedMetaData = fileMetadataRepository.save(fileMetadata);
+        FileResponse fileResponse = toFileResponse(savedMetaData);
 
-        return toFileResponse(savedmetaData);
+        String key = "file:" + id;
+        redisTemplate.opsForValue().set(key, fileResponse, Duration.ofMinutes(10));
+        log.info("Updated file cached in Redis: {}", key);
+
+        return fileResponse;
 
 
     }
