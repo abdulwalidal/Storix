@@ -1,259 +1,390 @@
 # Storix
 
-Storix is a lightweight object-storage backend built with Spring Boot.
+**Storix** is a Spring Boot backend for secure file storage and metadata management. It provides REST APIs for uploading, downloading, updating, deleting, and retrieving file metadata while associating files with authenticated users.
 
-The project is being developed incrementally to build a production-oriented backend for file storage, metadata management, authentication, asynchronous processing, caching, and scalable storage.
+The project is being built as a practical backend system to explore **Spring Boot, REST APIs, PostgreSQL, Spring Security, Redis caching, file storage, validation, and clean backend architecture**.
 
-## Overview
+---
 
-Storix allows users to upload and manage files while separating physical file storage from file metadata.
+## Features
 
-The current implementation uses local filesystem storage and PostgreSQL. As development progresses, the system will introduce authentication, caching, asynchronous events, cloud-compatible object storage, containerization, testing, monitoring, and CI/CD.
+### File Management
 
-## Current Features
+* Upload files
+* Download files
+* Retrieve file metadata by ID
+* Retrieve all files belonging to the authenticated user
+* Update/replace existing files
+* Delete files
+* Generate unique stored filenames using UUIDs
+* Store actual files on the local filesystem
+* Store file metadata in PostgreSQL
 
-- File upload
-- File download
-- File metadata management
-- File replacement
-- File deletion
-- File size validation
-- File name validation
-- Content type validation
-- UUID-based stored filenames
-- Configurable storage location
-- Configurable maximum file size
-- Path traversal protection
-- Custom application exceptions
-- Global exception handling
-- DTO-based API responses
-- PostgreSQL metadata persistence
-- Storage abstraction using `StorageService`
+### File Validation
 
-## Current Tech Stack
+Storix validates uploaded files for:
 
-- Java
-- Spring Boot
-- Spring Web
-- Spring Data JPA
-- Hibernate
-- PostgreSQL
-- Maven
-- Lombok
-- JUnit
-- Spring Boot Test
-- Postman
-- Git
-- GitHub
+* Empty files
+* Missing filenames
+* Maximum file size
+* Missing content types
+* Unsupported file types
+
+Currently supported content types:
+
+* `application/pdf`
+* `image/png`
+* `image/jpeg`
+* `text/plain`
+
+### Authentication & Authorization
+
+Storix uses **Spring Security** for authentication and authorization.
+
+* HTTP Basic authentication
+* User accounts stored in PostgreSQL
+* Passwords securely encoded
+* Role-based authorization
+* Users can only access their own files
+
+### Redis Caching
+
+Storix uses **Redis with Spring Cache** to improve file metadata retrieval performance.
+
+The metadata endpoint uses:
+
+```java
+@Cacheable(value = "files", key = "#id")
+```
+
+The caching flow is:
+
+```text
+Client
+  ↓
+FileController
+  ↓
+FileService
+  ↓
+Redis Cache
+  ↓
+Cache Hit ─────────→ Return cached metadata
+  ↓
+Cache Miss
+  ↓
+PostgreSQL
+  ↓
+Store result in Redis
+  ↓
+Return metadata
+```
+
+Redis is used as a cache rather than as the primary source of file metadata.
+
+### Exception Handling
+
+Storix includes centralized exception handling using `@ControllerAdvice`.
+
+Handled errors include:
+
+* File not found
+* Invalid file
+* Missing multipart file
+* Multipart request errors
+* Storage errors
+
+API errors are returned through a consistent `ErrorResponse` structure.
+
+---
 
 ## Architecture
 
-```text
-                         Client
-                           |
-                           v
-                      REST API
-                           |
-                           v
-                     FileController
-                           |
-                           v
-                      FileService
-                     /          \
-                    /            \
-                   v              v
-             Validation       Repository
-                   |              |
-                   v              v
-            StorageService     PostgreSQL
-                   |
-                   v
-          LocalStorageService
-                   |
-                   v
-            Local File System
-````
-
-The storage layer is abstracted through `StorageService`, allowing the physical storage implementation to be changed without heavily modifying the business logic.
-
-## Project Structure
+Storix follows a layered backend architecture:
 
 ```text
-src/
-└── main/
-    └── java/
-        └── com/
-            └── storix/
-                ├── controller/
-                ├── dto/
-                ├── exception/
-                ├── file/
-                ├── repository/
-                └── storage/
+                    ┌──────────────┐
+                    │    Client    │
+                    │ Postman/UI   │
+                    └──────┬───────┘
+                           │
+                           ▼
+                 ┌──────────────────┐
+                 │  REST Controller  │
+                 └────────┬─────────┘
+                          │
+                          ▼
+                 ┌──────────────────┐
+                 │   FileService    │
+                 └───────┬─────┬────┘
+                         │     │
+              ┌──────────┘     └──────────┐
+              ▼                           ▼
+       ┌─────────────┐             ┌─────────────┐
+       │    Redis    │             │ PostgreSQL  │
+       │    Cache    │             │  Metadata   │
+       └─────────────┘             └─────────────┘
+                                             │
+                                             ▼
+                                    ┌────────────────┐
+                                    │ Local Storage  │
+                                    │ Actual Files   │
+                                    └────────────────┘
 ```
 
-## API Endpoints
+A more detailed Redis architecture diagram is available in:
 
-| Method | Endpoint                   | Description       |
-| ------ | -------------------------- | ----------------- |
-| POST   | `/api/files`               | Upload a file     |
-| GET    | `/api/files/{id}`          | Get file metadata |
-| GET    | `/api/files/{id}/download` | Download a file   |
-| PUT    | `/api/files/{id}`          | Replace a file    |
-| DELETE | `/api/files/{id}`          | Delete a file     |
+`docs/redis-architecture.png`
 
-## File Storage
+---
 
-Files are currently stored on the local filesystem.
+##  Tech Stack
 
-The original filename is stored as metadata, while the physical file receives a UUID-based name.
+| Technology      | Purpose                        |
+| --------------- | ------------------------------ |
+| Java 21         | Programming language           |
+| Spring Boot     | Backend framework              |
+| Spring Web      | REST APIs                      |
+| Spring Data JPA | Database access                |
+| PostgreSQL      | File metadata & user data      |
+| Spring Security | Authentication & authorization |
+| Redis           | Caching                        |
+| Spring Cache    | Cache abstraction              |
+| Maven           | Dependency management          |
+| Lombok          | Boilerplate reduction          |
+| Docker          | Running Redis locally          |
+
+---
+
+##  Project Structure
 
 ```text
-Original filename:
+src/main/java/com/storix
+│
+├── config
+│   ├── CacheConfig.java
+│   ├── RedisConfig.java
+│   └── SecurityConfig.java
+│
+├── controller
+│   ├── FileController.java
+│   ├── RedisController.java
+│   └── UserController.java
+│
+├── dto
+│   ├── FileResponse.java
+│   ├── UserRequest.java
+│   └── UserResponse.java
+│
+├── exception
+│   ├── ErrorResponse.java
+│   ├── FileNotFoundException.java
+│   ├── GlobalExceptionHandler.java
+│   ├── InvalidFileException.java
+│   └── StorageException.java
+│
+├── file
+│   ├── FileMetadata.java
+│   └── FileService.java
+│
+├── repository
+│   ├── FileMetadataRepository.java
+│   └── UserRepository.java
+│
+├── service
+│   ├── CustomUserDetailsService.java
+│   ├── UserService.java
+│   └── UserServiceImpl.java
+│
+├── storage
+│   ├── LocalStorageService.java
+│   └── StorageService.java
+│
+└── user
+    ├── Role.java
+    └── User.java
+```
+
+---
+
+##  API Endpoints
+
+### User
+
+| Method | Endpoint | Description   |
+| ------ | -------- | ------------- |
+| `POST` | `/users` | Create a user |
+
+### Files
+
+| Method   | Endpoint               | Description                              |
+| -------- | ---------------------- | ---------------------------------------- |
+| `POST`   | `/files`               | Upload a file                            |
+| `GET`    | `/files`               | Get all files for the authenticated user |
+| `GET`    | `/files/{id}`          | Get file metadata                        |
+| `GET`    | `/files/{id}/download` | Download a file                          |
+| `PUT`    | `/files/{id}`          | Replace/update a file                    |
+| `DELETE` | `/files/{id}`          | Delete a file                            |
+
+All file endpoints require authentication.
+
+---
+
+##  Data Storage
+
+Storix separates **file metadata** from the **actual file contents**.
+
+### PostgreSQL
+
+PostgreSQL stores metadata such as:
+
+```text
+id
+originalFileName
+storedFileName
+contentType
+size
+user
+```
+
+### Local Filesystem
+
+The actual uploaded file is stored separately using a generated unique filename.
+
+For example:
+
+```text
+Original:
 report.pdf
 
-Stored filename:
+Stored:
 550e8400-e29b-41d4-a716-446655440000.pdf
 ```
 
-This prevents filename collisions and separates user-facing metadata from the physical storage representation.
+This prevents filename collisions and avoids directly exposing the original filename as the storage identifier.
 
-## Database
+---
 
-PostgreSQL stores file metadata such as:
+## Redis Caching
 
-* File ID
-* Original filename
-* Stored filename
-* Content type
-* File size
+File metadata retrieval is cached using Spring Cache backed by Redis.
 
-The actual file contents are currently stored separately on the local filesystem.
-
-## Validation
-
-Storix validates uploaded files before they reach the storage layer.
-
-Current validations include:
-
-* Empty file detection
-* Missing filename detection
-* Maximum file-size validation
-* Missing content-type detection
-
-Example configuration:
-
-```yaml
-storix:
-  storage:
-    location: storage
-    max-file-size: 10KB
-```
-
-## Exception Handling
-
-Storix uses custom exceptions and a centralized global exception handler.
-
-Current custom exceptions include:
-
-* `InvalidFileException`
-* `FileNotFoundException`
-* `StorageException`
-
-The global exception handler converts application exceptions into consistent HTTP responses.
-
-Example:
-
-```json
-{
-  "status": 404,
-  "code": "FILE_NOT_FOUND",
-  "message": "File not found"
-}
-```
-
-## Security
-
-Current security-related features include:
-
-* Path traversal protection
-* UUID-based stored filenames
-* File validation
-* Centralized exception handling
-* Separation between database entities and API DTOs
-
-Authentication and authorization will be introduced in a later phase.
-
-## Configuration
-
-Example:
-
-```yaml
-spring:
-  application:
-    name: storix
-
-  datasource:
-    url: jdbc:postgresql://localhost:5432/storix
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-
-server:
-  port: 8080
-
-storix:
-  storage:
-    location: storage
-    max-file-size: 10KB
-```
-
-Sensitive credentials should be provided through environment variables and must not be committed to the repository.
-
-## Running Locally
-
-### Requirements
-
-* Java 21+
-* Maven
-* PostgreSQL
-* Git
-
-### Clone
-
-```bash
-git clone https://github.com/abdulwalidal/Storix.git
-cd Storix
-```
-
-### Database
-
-Create a PostgreSQL database:
-
-```sql
-CREATE DATABASE storix;
-```
-
-Configure:
+### Cache Miss
 
 ```text
-DB_USERNAME=your_username
-DB_PASSWORD=your_password
+GET /files/1
+      ↓
+Redis
+      ↓
+MISS
+      ↓
+PostgreSQL
+      ↓
+FileResponse
+      ↓
+Redis
+      ↓
+Client
 ```
 
-### Run
+### Cache Hit
 
-Linux/macOS:
+```text
+GET /files/1
+      ↓
+Redis
+      ↓
+HIT
+      ↓
+FileResponse
+      ↓
+Client
+```
+
+The purpose is to avoid repeatedly querying PostgreSQL for frequently requested metadata.
+
+---
+
+##  Security Flow
+
+```text
+Client
+   │
+   │ Credentials
+   ▼
+Spring Security
+   │
+   ▼
+CustomUserDetailsService
+   │
+   ▼
+PostgreSQL
+   │
+   ▼
+Authenticated User
+   │
+   ▼
+Authorization
+   │
+   ▼
+FileController
+   │
+   ▼
+FileService
+```
+
+File queries use the authenticated user's email to ensure users only access their own files.
+
+---
+
+##  Running Locally
+
+### Prerequisites
+
+Make sure you have:
+
+* Java 21
+* Maven
+* PostgreSQL
+* Docker
+* Redis
+
+### Start Redis
+
+Redis can be run locally through Docker.
+
+```bash
+docker run --name storix-redis -p 6379:6379 -d redis
+```
+
+Verify Redis is running:
+
+```bash
+docker ps
+```
+
+You can also connect using the Redis CLI:
+
+```bash
+redis-cli
+```
+
+### Configure the Application
+
+Configure your PostgreSQL and Redis connection details in:
+
+```text
+src/main/resources/application.yaml
+```
+
+### Run the Application
+
+Using Maven:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-Windows:
+On Windows:
 
 ```bash
 mvnw.cmd spring-boot:run
@@ -265,161 +396,103 @@ The application will run on:
 http://localhost:8080
 ```
 
-## Development Roadmap
-
-Storix will be developed in multiple phases.
-
-### Phase 1 — Core File Storage
-
-* [x] File upload
-* [x] File download
-* [x] File replacement
-* [x] File deletion
-* [x] Local filesystem storage
-* [x] PostgreSQL metadata
-* [x] Validation
-* [x] Exception handling
-* [x] DTO-based responses
-
-### Phase 2 — API & Code Quality
-
-* [ ] Complete DTO architecture
-* [ ] Service-layer improvements
-* [ ] Repository improvements
-* [ ] Unit tests
-* [ ] Integration tests
-* [ ] OpenAPI / Swagger documentation
-
-### Phase 3 — Users & Security
-
-* [ ] User accounts
-* [ ] Spring Security
-* [ ] JWT authentication
-* [ ] User registration/login
-* [ ] Password hashing
-* [ ] File ownership
-* [ ] Authorization
-* [ ] Per-user file access
-
-### Phase 4 — Caching & Performance
-
-* [ ] Redis
-* [ ] Metadata caching
-* [ ] Rate limiting
-* [ ] Performance improvements
-* [ ] Cache invalidation strategies
-
-### Phase 5 — Asynchronous Processing
-
-* [ ] Apache Kafka
-* [ ] File upload events
-* [ ] File deletion events
-* [ ] Asynchronous background processing
-* [ ] Event-driven architecture
-
-### Phase 6 — Object Storage
-
-* [ ] Storage provider abstraction improvements
-* [ ] MinIO
-* [ ] S3-compatible storage
-* [ ] Configurable storage providers
-* [ ] Multipart uploads for large files
-
-### Phase 7 — Containerization & Deployment
-
-* [ ] Docker
-* [ ] Docker Compose
-* [ ] Containerized PostgreSQL
-* [ ] Containerized Redis
-* [ ] Containerized Kafka
-* [ ] Production configuration
-* [ ] Deployment
-
-### Phase 8 — Observability
-
-* [ ] Spring Boot Actuator
-* [ ] Application metrics
-* [ ] Prometheus
-* [ ] Grafana
-* [ ] Structured logging
-* [ ] Health checks
-
-### Phase 9 — CI/CD
-
-* [ ] GitHub Actions
-* [ ] Automated tests
-* [ ] Automated builds
-* [ ] Docker image builds
-* [ ] Deployment pipeline
-
-## Planned Architecture
-
-As the project evolves, the architecture will move toward:
-
-```text
-                         Client
-                           |
-                           v
-                      REST API
-                           |
-                           v
-                    Spring Security
-                           |
-                           v
-                     Controllers
-                           |
-                           v
-                      FileService
-                     /    |     \
-                    /     |      \
-                   v      v       v
-              PostgreSQL Redis   Storage
-                         |
-                         v
-                       Cache
-
-              File Events
-                   |
-                   v
-                 Kafka
-                   |
-          +--------+--------+
-          |        |        |
-          v        v        v
-      Processing  Audit   Workers
-```
-
-The exact architecture will evolve as each component is introduced.
+---
 
 ## Testing
 
-The project uses Spring Boot testing tools and JUnit for automated testing.
+Testing is planned as the next major development stage.
 
-Postman is currently used for manual API testing.
+The project will include:
 
-Integration testing with containerized dependencies will be introduced later using Testcontainers.
+* Unit tests
+* Service-layer tests
+* Controller tests
+* Integration tests
+* Database-related tests
+* Redis/cache-related tests
 
-## Future Goals
+---
 
-The long-term goal is to turn Storix from a simple local file-storage API into a more complete object-storage backend with:
+##  Roadmap
 
-* Multi-user support
-* Authentication and authorization
-* Scalable object storage
+### Completed
+
+* [x] Spring Boot project setup
+* [x] REST API structure
+* [x] PostgreSQL integration
+* [x] JPA entities and repositories
+* [x] Local file storage
+* [x] File upload
+* [x] File download
+* [x] File metadata retrieval
+* [x] File listing
+* [x] File update/replace
+* [x] File deletion
+* [x] File validation
+* [x] User accounts
+* [x] Spring Security
+* [x] Authentication
+* [x] Authorization
+* [x] Global exception handling
+* [x] Redis integration
+* [x] Spring Cache
+* [x] `@Cacheable` file metadata caching
+* [x] Redis cache testing
+* [x] Redis architecture documentation
+
+### Upcoming
+
+* [ ] Improve cache key design
+* [ ] Add cache eviction/update handling
+* [ ] Configure production-friendly cache TTL
+* [ ] Unit testing
+* [ ] Integration testing
+* [ ] Spring Boot Actuator
+* [ ] Application metrics
+* [ ] Improved observability
+* [ ] Complete Docker setup
+* [ ] Production deployment
+* [ ] Explore S3-style object storage architecture
+
+---
+
+##  Project Goal
+
+Storix is being developed as a practical backend project to understand how real-world backend systems are designed and how different components work together.
+
+The long-term goal is to evolve Storix from a simple local file-storage API into a more production-oriented **object storage backend**, while learning concepts such as:
+
+* REST API design
+* Authentication & authorization
+* Database design
 * Caching
-* Event-driven processing
-* Asynchronous workers
-* Containerized infrastructure
-* Monitoring
-* Automated CI/CD
-* Production-ready configuration
+* Distributed systems concepts
+* Testing
+* Observability
+* Containerization
+* Object storage architecture
+* Scalability
 
-## Project Status
+---
 
-Storix is currently under active development.
+##  Documentation
 
-Features are being implemented incrementally, with each phase introducing new backend concepts and infrastructure.
+Architecture documentation and diagrams are available in:
 
-The project is intended as a practical exploration of backend engineering, distributed systems, storage architecture, security, performance, and deployment.
+```text
+docs/
+```
 
-````
+Current documentation includes:
+
+```text
+docs/redis-architecture.png
+```
+
+---
+
+##  Status
+
+Storix is an **actively developed learning project** focused on building practical backend engineering skills with Java and Spring Boot.
+
+The project is currently focused on improving the backend architecture, testing, performance, and production readiness.
