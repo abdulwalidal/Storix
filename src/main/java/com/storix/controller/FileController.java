@@ -62,9 +62,19 @@ public class FileController {
 
     @GetMapping("/{id}")
     public ResponseEntity<FileResponse> getFileById(@PathVariable Long id) {
-        FileResponse fileResponse = fileService.getFileMetaData(id);
 
-        return ResponseEntity.ok(fileResponse);
+        long start = System.nanoTime();
+
+        FileResponse response = fileService.getFileMetaData(id);
+
+        long end = System.nanoTime();
+
+        log.info("Request took {} ms",
+                (end - start) / 1_000_000.0);
+
+        // FileResponse fileResponse = fileService.getFileMetaData(id);
+
+        return ResponseEntity.ok(response);
 
     }
 

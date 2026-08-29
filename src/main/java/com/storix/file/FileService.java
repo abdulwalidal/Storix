@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.io.Resource;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.Authentication;
@@ -21,6 +22,7 @@ import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.Serializable;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
@@ -44,13 +46,13 @@ public class FileService {
     private final StorageService storageService;
     private final FileMetadataRepository fileMetadataRepository;
     private final UserRepository userRepository;
-    private final RedisTemplate<String, FileResponse> redisTemplate;
+//    private final RedisTemplate<String, FileResponse> redisTemplate;
 
-    public FileService(StorageService storageService, FileMetadataRepository fileMetadataRepository, UserRepository userRepository, RedisTemplate<String, FileResponse> redisTemplate) {
+    public FileService(StorageService storageService, FileMetadataRepository fileMetadataRepository, UserRepository userRepository) {
         this.storageService = storageService;
         this.fileMetadataRepository = fileMetadataRepository;
         this.userRepository = userRepository;
-        this.redisTemplate = redisTemplate;
+//        this.redisTemplate = redisTemplate;
     }
 
     public FileResponse upload(MultipartFile file) {
@@ -118,55 +120,56 @@ public class FileService {
         return storageService.load(fileMetadata.getStoredFileName());
     }
 
-    public FileResponse getFileMetaData(Long id) {
+        @Cacheable(value = "files", key = "#id")
+        public FileResponse getFileMetaData(Long id) {
 
-        String email = SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getName();
+            String email = SecurityContextHolder.getContext()
+                    .getAuthentication()
+                    .getName();
 
-        String key = "file:" + id;
+    //        String key = "file:" + id;
+    //
+    //        // 1. Check Redis
+    //        long redisStart = System.nanoTime();
+    //
+    //        FileResponse cachedFile = redisTemplate.opsForValue().get(key);
+    //
+    //        long redisEnd = System.nanoTime();
+    //
+    //        log.info("Redis GET took {} ms",
+    //                (redisEnd - redisStart) / 1_000_000.0);
+    //
+    //        // 2. If found in Redis, return it
+    //        if (cachedFile != null) {
+    //            log.info("File metadata found in Redis: {}", key);
+    //            return cachedFile;
+    //        }
 
-        // 1. Check Redis
-        long redisStart = System.nanoTime();
+            // 3. Not found in Redis → check PostgreSQL
+    //        log.info("File metadata not found in Redis. Checking PostgreSQL");
 
-        FileResponse cachedFile = redisTemplate.opsForValue().get(key);
+            long postgresStart = System.nanoTime();
 
-        long redisEnd = System.nanoTime();
+            FileMetadata fileMetadata =
+                    fileMetadataRepository.findByIdAndUserEmail(id, email)
+                            .orElseThrow(() ->
+                                    new FileNotFoundException("File not found"));
 
-        log.info("Redis GET took {} ms",
-                (redisEnd - redisStart) / 1_000_000.0);
+            long postgresEnd = System.nanoTime();
 
-        // 2. If found in Redis, return it
-        if (cachedFile != null) {
-            log.info("File metadata found in Redis: {}", key);
-            return cachedFile;
+            log.info("PostgreSQL GET took {} ms",
+                    (postgresEnd - postgresStart) / 1_000_000.0);
+
+            // 4. Convert database entity to response
+            FileResponse fileResponse = toFileResponse(fileMetadata);
+    //
+    //        // 5. Store response in Redis
+    //        redisTemplate.opsForValue().set(key, fileResponse, Duration.ofMinutes(10));
+
+           // log.info("Response stored in Redis: {}", key);
+
+            return fileResponse;
         }
-
-        // 3. Not found in Redis → check PostgreSQL
-        log.info("File metadata not found in Redis. Checking PostgreSQL");
-
-        long postgresStart = System.nanoTime();
-
-        FileMetadata fileMetadata =
-                fileMetadataRepository.findByIdAndUserEmail(id, email)
-                        .orElseThrow(() ->
-                                new FileNotFoundException("File not found"));
-
-        long postgresEnd = System.nanoTime();
-
-        log.info("PostgreSQL GET took {} ms",
-                (postgresEnd - postgresStart) / 1_000_000.0);
-
-        // 4. Convert database entity to response
-        FileResponse fileResponse = toFileResponse(fileMetadata);
-
-        // 5. Store response in Redis
-        redisTemplate.opsForValue().set(key, fileResponse, Duration.ofMinutes(10));
-
-        log.info("Response stored in Redis: {}", key);
-
-        return fileResponse;
-    }
 
     public void delete(Long id) {
 
@@ -181,8 +184,8 @@ public class FileService {
         storageService.delete(fileMetadata.getStoredFileName());
 
         fileMetadataRepository.delete(fileMetadata);
-        String key = "file:" + id;
-        redisTemplate.delete(key);
+//        String key = "file:" + id;
+//        redisTemplate.delete(key);
 
     }
 
@@ -216,10 +219,10 @@ public class FileService {
 
         FileMetadata savedMetaData = fileMetadataRepository.save(fileMetadata);
         FileResponse fileResponse = toFileResponse(savedMetaData);
-
-        String key = "file:" + id;
-        redisTemplate.opsForValue().set(key, fileResponse, Duration.ofMinutes(10));
-        log.info("Updated file cached in Redis: {}", key);
+//
+//        String key = "file:" + id;
+//        redisTemplate.opsForValue().set(key, fileResponse, Duration.ofMinutes(10));
+//        log.info("Updated file cached in Redis: {}", key);
 
         return fileResponse;
 
