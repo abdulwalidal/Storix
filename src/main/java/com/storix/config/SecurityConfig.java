@@ -55,6 +55,7 @@ public class SecurityConfig {
                             .permitAll()
                             .requestMatchers("/files/**").hasRole("USER")
                             .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                            .requestMatchers(("/redis/**")).permitAll()
                             .anyRequest().authenticated();
                 })
                 .csrf(csrf ->csrf.disable())
